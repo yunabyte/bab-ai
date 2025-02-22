@@ -12,4 +12,4 @@ lcc.py : LangChainCustom (커스텀 체인)
 - 챗봇 성능이 향상된 코드를 push한 경우, AI 팀원들에게 DM을 보내 최신 버전으로 업데이트하도록 안내해주세요.
   - git pull origin main
   - git push origin main
-  - 현재 서비스 진행 중이 아니므로 별도의 브랜치 없이 main에서 개발을 진행합니다.
+  - 각자 브랜치 파서 진행하고 merge 하도록 할게요.
