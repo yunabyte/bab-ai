@@ -1,84 +1,120 @@
 # api/main.py
 
-from fastapi import FastAPI, Query
 import os
-import psycopg2
 from dotenv import load_dotenv
-from langchain.chat_models import ChatOpenAI
-import json
+from openai import OpenAI
+from langchain.llms import OpenAI as LLMOpenAI
+from langchain import PromptTemplate, LLMChain
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import psycopg2
 
-# 환경 변수 로드 (.env 파일)
-load_dotenv(os.path.join(os.path.dirname(__file__), "../config/.env"))
+# .env 파일 로드 (config 폴더 내 .env 파일 경로 지정)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../config/.env"))
 
-app = FastAPI()
+# 환경변수 가져오기
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not SUPABASE_DB_URL or not OPENAI_API_KEY:
+    raise Exception("필수 환경 변수가 없습니다.")
+
+# OpenAI API 설정
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def get_connection():
-    DB_URL = os.getenv("SUPABASE_DB_URL")
-    return psycopg2.connect(DB_URL)
+    """psycopg2를 사용해 데이터베이스 연결을 생성합니다."""
+    return psycopg2.connect(SUPABASE_DB_URL)
 
-# LLM 설정 (OpenAI API 사용)
-llm = ChatOpenAI(
-    model_name="gpt-4", 
-    temperature=0.7,
-    openai_api_key=os.getenv("OPENAI_API_KEY")
-)
+def get_embedding(text: str) -> list:
+    """
+    OpenAI 임베딩 API를 호출해 주어진 텍스트의 임베딩 벡터를 반환합니다.
+    """
+    response = client.embeddings.create(model="text-embedding-ada-002",
+    input=text)
+    return response.data[0].embedding
 
-# DB에서 식당 데이터를 가져와 텍스트로 변환하는 함수
-def get_restaurants_text():
+def search_restaurants(query_embedding: list, top_n: int = 5) -> list:
+    """
+    쿼리 임베딩 벡터와 데이터베이스에 저장된 키워드 임베딩 벡터 간 유사도 연산을 통해
+    관련 식당 정보를 조회합니다.
+    """
     conn = get_connection()
     cur = conn.cursor()
-    # 필요한 컬럼 선택 (menu는 JSONB 타입이라 DB에서 가져올 때 이미 파이썬 객체로 반환될 수 있음)
-    cur.execute("SELECT name, menu FROM restaurants;")
-    rows = cur.fetchall()
+
+    # query_embedding을 pgvector가 인식할 수 있도록 문자열로 변환 (공백 없이)
+    embedding_str = str(query_embedding).replace(" ", "")
+
+    sql = f"""
+    SELECT r.name, r.ctg2
+    FROM keywords k
+    JOIN restaurant_keywords rk ON k.id = rk.keyword_id
+    JOIN restaurants r ON rk.restaurant_id = r.id
+    ORDER BY k.embedding <-> '{embedding_str}'::vector
+    LIMIT {top_n};
+    """
+    try:
+        cur.execute(sql)
+        rows = cur.fetchall()
+    except Exception as e:
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"데이터베이스 쿼리 에러: {e}")
+
     cur.close()
     conn.close()
-    
-    restaurants_info = []
-    for row in rows:
-        name, menu = row
-        # 만약 menu가 문자열이면 파싱, 리스트면 그대로 사용
-        if isinstance(menu, str):
-            try:
-                menu_list = json.loads(menu)
-            except Exception as e:
-                print("JSON 파싱 에러:", e)
-                menu_list = []
-        elif isinstance(menu, list):
-            menu_list = menu
-        else:
-            menu_list = []
-            
-        # 메뉴 항목을 "메뉴명 (가격원)" 형태로 변환
-        menu_str = ", ".join(
-            [f"{item.get('name', 'N/A')} ({item.get('price', 'N/A')}원)" for item in menu_list]
-        )
-        info = f"식당 이름: {name}\n메뉴 및 가격: {menu_str}"
-        restaurants_info.append(info)
-    return "\n\n".join(restaurants_info)
 
-@app.get("/")
-def read_root():
-    return {"message": "Restaurant Recommendation API is running!"}
+    results = [{"name": row[0], "ctg2": row[1]} for row in rows]
+    return results
 
-@app.get("/recommend")
-def recommend(query: str = Query(..., description="추천 받고 싶은 식당에 대한 자연어 질문을 입력하세요")):
-    # Supabase에서 식당 정보 가져오기
-    restaurants_text = get_restaurants_text()
-    
-    # 사용자 쿼리와 식당 정보를 포함하는 프롬프트 생성
-    prompt = f"""
-    당신은 식당 추천 챗봇입니다.
-    사용자 질문: "{query}"
-    
-    다음은 데이터베이스에 저장된 식당 정보입니다:
-    {restaurants_text}
-    
-    위 정보를 바탕으로 사용자에게 적절한 식당 추천을 한글로 해주세요.
-    메뉴와 가격도 함께 제시해주세요.
+# LangChain 프롬프트 템플릿 및 LLMChain 설정 (프롬프트 한국어)
+prompt_template = PromptTemplate(
+    input_variables=["query", "restaurant_info"],
+    template="""
+당신은 친절한 식당 추천 도우미입니다.
+사용자 질문: "{query}"
+
+데이터베이스에 저장된 다음 식당 정보를 참고하여,
+사용자에게 적절한 식당을 추천해 주세요.
+식당 이름, 메뉴, 가격 등을 포함하여 자연스럽게 설명해 주세요.
+
+식당 정보:
+{restaurant_info}
     """
-    response = llm.predict(prompt)
-    return {"recommendation": response}
+)
+llm = LLMOpenAI(temperature=0.7, openai_api_key=OPENAI_API_KEY)
+chain = LLMChain(llm=llm, prompt=prompt_template)
+
+# FastAPI 애플리케이션 생성
+app = FastAPI()
+
+# 요청 및 응답 모델 정의
+class RecommendRequest(BaseModel):
+    query: str
+
+class RecommendResponse(BaseModel):
+    recommendation: str
+
+@app.post("/recommend", response_model=RecommendResponse)
+def recommend_endpoint(req: RecommendRequest):
+    user_query = req.query
+
+    # 1. 사용자 쿼리 임베딩 생성
+    query_embedding = get_embedding(user_query)
+
+    # 2. 데이터베이스에서 벡터 연산을 통해 관련 식당 정보 조회
+    restaurant_results = search_restaurants(query_embedding)
+
+    # 3. 조회된 식당 정보를 문자열로 조합 (예: "식당명 - 카테고리: ...")
+    restaurant_info_str = "\n".join(
+        [f"{r['name']} - 카테고리: {', '.join(r['ctg2'])}" for r in restaurant_results]
+    )
+
+    # 4. LangChain을 사용해 추천 메시지 생성
+    recommendation = chain.run({"query": user_query, "restaurant_info": restaurant_info_str})
+
+    return RecommendResponse(recommendation=recommendation)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
