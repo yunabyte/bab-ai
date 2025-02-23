@@ -1,0 +1,12 @@
+psycopg2
+python-dotenv
+# postgresql 버전 추가 필요
+openai
+langchain
+langchain_community
+langchain_openai
+langchain_core
+langchain_chroma
+langchain_community
+langchain_openai
+langchain_core
