@@ -1,33 +1,31 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-import openai
+from openai import OpenAI
 
-# .env 파일에서 환경변수를 로드합니다.
 load_dotenv(dotenv_path="config/.env")
-print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
-print("SUPABASE_DB_URL:", os.getenv("SUPABASE_DB_URL"))
+
+
 
 # 환경변수에서 Supabase URL, Anon Key, OpenAI API 키 가져오기
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+client = OpenAI(api_key=OPENAI_API_KEY)
+
 # Supabase 클라이언트 생성
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 # OpenAI API 키 설정
-openai.api_key = OPENAI_API_KEY
 
 def get_embedding(text: str) -> list:
     """
     OpenAI의 임베딩 API를 호출하여 text의 임베딩 벡터를 반환합니다.
     """
-    response = openai.Embedding.create(
-        model="text-embedding-ada-002",
-        input=text
-    )
-    embedding = response["data"][0]["embedding"]
+    response = client.embeddings.create(model="text-embedding-ada-002",
+    input=text)
+    embedding = response.data[0].embedding
     return embedding
 
 def update_keyword_embeddings():
