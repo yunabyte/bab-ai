@@ -4,7 +4,7 @@ import os
 
 json_path = os.path.join(os.path.dirname(__file__), "../db/store_data.json")
 
-csv_path = os.path.join(os.path.dirname(__file__), "../db/store_data.json")
+csv_path = os.path.join(os.path.dirname(__file__), "../db/store_dataa.csv")
 
 with open(json_path, "r", encoding="utf-8") as json_file:
     data = json.load(json_file)

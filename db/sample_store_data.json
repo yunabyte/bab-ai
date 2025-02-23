@@ -1,0 +1,74 @@
+[
+    {
+        "id": 0,
+        "name": "후루룩손칼국수",
+        "thumbnail": "../pictures/p0.jpg",
+        "menu": [
+            {
+                "name": "국산콩국수",
+                "price": "9500"
+            },
+            {
+                "name": "한그릇바지락칼국수",
+                "price": "10000"
+            },
+            {
+                "name": "한그릇바지락수제비",
+                "price": "10000"
+            },
+            {
+                "name": "얼큰 만두전골",
+                "price": "11000"
+            },
+            {
+                "name": "바지락칼국수",
+                "price": "10000"
+            }
+        ],
+        "ctg1": [],
+        "ctg2": [
+            "칼국수"
+        ],
+        "diet": false,
+        "cheap": false,
+        "latitude": null,
+        "longitude": null,
+        "kakao_link": "https://map.kakao.com/?q=%ED%9B%84%EB%A3%A8%EB%A3%A9%EC%86%90%EC%B9%BC%EA%B5%AD%EC%88%98%20%ED%8C%90%EA%B5%90"
+    },
+    {
+        "id": 1,
+        "name": "고향옥얼큰순대국 삼평점",
+        "thumbnail": "../pictures/p1.jpg",
+        "menu": [
+            {
+                "name": "얼큰순대국",
+                "price": "12000"
+            },
+            {
+                "name": "순순대국",
+                "price": "11000"
+            },
+            {
+                "name": "뼈해장국",
+                "price": "11000"
+            },
+            {
+                "name": "얼큰내장국밥",
+                "price": "12000"
+            },
+            {
+                "name": "얼큰수육국밥",
+                "price": "12000"
+            }
+        ],
+        "ctg1": [],
+        "ctg2": [
+            "국밥"
+        ],
+        "diet": false,
+        "cheap": false,
+        "latitude": null,
+        "longitude": null,
+        "kakao_link": "https://map.kakao.com/?q=%EA%B3%A0%ED%96%A5%EC%98%A5%EC%96%BC%ED%81%B0%EC%88%9C%EB%8C%80%EA%B5%AD%20%EC%82%BC%ED%8F%89%EC%A0%90%20%ED%8C%90%EA%B5%90"
+    }
+]
